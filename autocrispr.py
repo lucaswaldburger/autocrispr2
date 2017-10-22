@@ -1,38 +1,36 @@
-import time
-import tkMessageBox
-from Tkinter import *
+
+import curses
 from LW_DNA_tools import *
 
 '''
 File name:          autocrispr.py
 Author:             Lucas M. Waldburger
 Date created:       07/28/17
-Date last modified: 09/04/17
+Date last modified: 10/20/17
 Python version:     2.7
 Description:        User input is used to generate CRISPR oligos for assembly with pCas9 entry vectors designed by
                     Kevin Schmitz. Output is in the form of a text file that can easily be copy and pasted
                     into the Dueber Lab Website.
 '''
-
-global loci
-loci = {}
+# global loci
+# loci = {}
 
 class Design_CRISPR_Oligos:
 
-    def __init__(self, genelocus, protospacer, genomicseq):
-        self.genelocus = genelocus
+    def __init__(self, protospacer, genomicseq):
+        # self.genelocus = genelocus
         self.protospacer = protospacer
         self.genomicseq = genomicseq
+        #
+        # if self.genelocus in loci:
+        #     loci[self.genelocus] += 1
+        #     num = loci[self.genelocus]
+        # else:
+        #     loci[self.genelocus] = 1
+        #     num = loci[self.genelocus]
+        # self.name = self.genelocus + '-' + str(num)
 
-        if self.genelocus in loci:
-            loci[self.genelocus] += 1
-            num = loci[self.genelocus]
-        else:
-            loci[self.genelocus] = 1
-            num = loci[self.genelocus]
-        self.name = self.genelocus + '-' + str(num)
-
-    def assemble(self):
+    def run(self):
         # 5' --> 3' forward gRNA oligo sequence
         fw_gRNA = 'GACTTT' + self.protospacer
 
@@ -48,98 +46,147 @@ class Design_CRISPR_Oligos:
                                                          len(self.genomicseq) - 1000:len(self.genomicseq) - 1000 + 50]
         self.repairs = [fw_repairDNA, reverse_complement(rev_repairDNA)]
 
-        return [self.guides, self.repairs, self.name]
+        return [self.guides, self.repairs]
 
-class Options(Frame):
+def my_raw_input(stdscr, r, c, prompt_string):
+    curses.echo()
+    stdscr.addstr(r, c, prompt_string)
+    stdscr.refresh()
+    input = stdscr.getstr(r + 1, c, 20)
+    return input  #       ^^^^  reading input at next line
 
-    def __init__(self, parent):
-        Frame.__init__(self, parent)
-        self.parent = parent
-        self.count = 2
-        self.entries = []
+def draw_menu(stdscr):
+    k = 0
+    cursor_x = 0
+    cursor_y = 0
 
-        user_entry = Entry(self)
-        startprimer_entry = Entry(self)
-        genelocus_entry = Entry(self)
-        protospacer_entry = Entry(self)
-        genomic_entry = Entry(self)
+    # Clear and refresh the screen for a blank canvas
+    stdscr.clear()
+    stdscr.refresh()
 
-        self.user = user_entry
-        self.startprimer = startprimer_entry
+    # Start colors in curses
+    curses.start_color()
+    curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
 
-        user_entry.grid(row=1, column=1)
-        startprimer_entry.grid(row=3, column=1)
-        genelocus_entry.grid(row=1, column=2)
-        protospacer_entry.grid(row=1, column=3)
-        genomic_entry.grid(row=1, column=4)
+    # Loop where k is the last character pressed
+    while (k != ord('q')):
 
-        self.entries.append([genelocus_entry, protospacer_entry, genomic_entry])
+        # Initialization
+        stdscr.clear()
+        height, width = stdscr.getmaxyx()
 
-    def add(self):
-        new_genelocus_entry = Entry(self)
-        new_protospacer_entry = Entry(self)
-        new_genomic_entry = Entry(self)
+        # if k == curses.KEY_DOWN:
+        #     cursor_y = cursor_y + 1
+        # elif k == curses.KEY_UP:
+        #     cursor_y = cursor_y - 1
+        # elif k == curses.KEY_RIGHT:
+        #     cursor_x = cursor_x + 1
+        # elif k == curses.KEY_LEFT:
+        #     cursor_x = cursor_x - 1
+        #
+        # cursor_x = max(0, cursor_x)
+        # cursor_x = min(width-1, cursor_x)
+        #
+        # cursor_y = max(0, cursor_y)
+        # cursor_y = min(height-1, cursor_y)
 
-        new_genelocus_entry.grid(row=self.count, column=2)
-        new_protospacer_entry.grid(row=self.count, column=3)
-        new_genomic_entry.grid(row=self.count, column=4)
-        self.count += 1
+        # Declaration of strings
+        title = "Go Go CRISPR!"[:width-1]
+        subtitle = "Written by Lucas Waldburger"[:width-1]
+        # keystr = "Last key pressed: {}".format(k)[:width-1]
+        statusbarstr = "Press 'q' to exit | STATUS BAR | Pos: {}, {}".format(cursor_x, cursor_y)
+        # if k == 0:
+        #     keystr = "No key press detected..."[:width-1]
 
-        self.entries.append([new_genelocus_entry, new_protospacer_entry, new_genomic_entry])
+        # Centering calculations
+        start_x_title = int((width // 2) - (len(title) // 2) - len(title) % 2)
+        start_x_subtitle = int((width // 2) - (len(subtitle) // 2) - len(subtitle) % 2)
+        # start_x_keystr = int((width // 2) - (len(keystr) // 2) - len(keystr) % 2)
+        start_y = int((height // 2) - int(height // 2.1))
 
-    def output(self):
-        oligos = []
-        loci = {}
-        current_user = self.user.get()
+        # Rendering some text
+        # whstr = "Width: {}, Height: {}".format(width, height)
+        # stdscr.addstr(0, 0, whstr, curses.color_pair(1))
 
-        for entry in self.entries:
-            oligo = Design_CRISPR_Oligos(entry[0].get(), entry[1].get(), entry[2].get()) #gene locus, protospacer, genomic sequence
-            oligos.append(oligo.assemble())
+        # Render status bar
+        stdscr.attron(curses.color_pair(3))
+        stdscr.addstr(height-1, 0, statusbarstr)
+        stdscr.addstr(height-1, len(statusbarstr), " " * (width - len(statusbarstr) - 1))
+        stdscr.attroff(curses.color_pair(3))
 
-        date = time.strftime("%Y%m%d")
-        filename = date + "_GoGoCRISPRoutput.txt"
-        file = open(filename, "w")
+        # Turning on attributes for title
+        stdscr.attron(curses.color_pair(1))
+        stdscr.attron(curses.A_BOLD)
 
-        # overwrite output file
-        file.write("")
-        myprimers = oligo_counter(str(self.startprimer.get()), len(self.entries))
-        j = 0
+        # Rendering title
+        stdscr.addstr(start_y, start_x_title, title)
 
-        for i in range(len(oligos)):
-            file.write(
-                myprimers[j] + '.' + current_user + '\t' + oligos[i][0][0] + '\t' + oligos[i][2] + ' fw gRNA\n')
-            file.write(
-                myprimers[j + 1] + '.' + current_user + '\t' + oligos[i][0][1] + '\t' + oligos[i][2] + ' rev gRNA\n')
-            file.write(myprimers[j + 2] + '.' + current_user + '\t' + oligos[i][1][0] + '\t' + oligos[i][
-                2] + ' fw repair DNA\n')
-            file.write(myprimers[j + 3] + '.' + current_user + '\t' + oligos[i][1][1] + '\t' + oligos[i][
-                2] + ' rev repair DNA\n')
-            j += 4
+        # Turning off attributes for title
+        stdscr.attroff(curses.color_pair(1))
+        stdscr.attroff(curses.A_BOLD)
 
-        tkMessageBox._show("SUCCESS!", "CRISPR oligos have been saved as " + filename)
+        # Print rest of text
+        stdscr.addstr(start_y + 1, start_x_subtitle, subtitle)
+        # stdscr.addstr(start_y + 3, (width // 2) - 2, '-' * 4)
+        # stdscr.addstr(start_y + 5, start_x_keystr, keystr)
+        # stdscr.move(cursor_y, cursor_x)
+
+
+
+        # #user intials
+        # user_init = my_raw_input(stdscr, 5, int(width // 10), "User initials: ").lower()
+        # if user_init != "" and len(user_init) > 1 and len(user_init) < 3 :
+        #     stdscr.addstr(5,int(width-30) , "User Added!")
+        # else:
+        #     stdscr.addstr(5,int(width-30), " Invalid input")
+
+        # #current oligo
+        # start_oligo = my_raw_input(stdscr, 7, int(width // 10), "Current oligo: ").lower()
+        # if user_init != "":
+        #     stdscr.addstr(7,int(width-30), "Position Added!")
+        # else:
+        #     stdscr.addstr(7,int(width-30), " Invalid input")
+        #
+        # #locus name
+        # locus_name = my_raw_input(stdscr, 9, int(width // 10), "Locus name: ").lower()
+        # if locus_name != "":
+        #     stdscr.addstr(9,int(width-30), "Name Added!")
+        # else:
+        #     stdscr.addstr(9,int(width-30), " Invalid input")
+
+        #gRNA seq
+        grna_in = my_raw_input(stdscr, 5, int(width // 10), "Protospacer: ").lower()
+        if grna_in != "" and len(grna_in) == 20:
+            stdscr.addstr(5,int(width-30), "Protospacer Added!")
+        else:
+            stdscr.addstr(5,int(width-30), "Invalid input")
+
+        #genomic seq
+        seq_in = my_raw_input(stdscr, 7, int(width // 10), "Genomic sequence (+/- 1 kb): ").lower()
+        if seq_in != "" and len(seq_in) > 2000:
+            stdscr.addstr(7,int(width-30), "Sequence Added!")
+        else:
+            stdscr.addstr(7,int(width-30), "Invalid input")
+
+        oligos = Design_CRISPR_Oligos(grna_in,seq_in).run()
+
+
+        stdscr.addstr(10,int(width // 10),"OUTPUT")
+        stdscr.addstr(12, int(width // 10), "forward gRNA \t reverse gRNA \t forward repair DNA \t reverse repair DNA")
+        stdscr.addstr(13,int(width//2),oligos[0][0] + "\t" + oligos[0][1] + "\t" + oligos[1][0] + "\t" + oligos[1][1]  )
+
+        # stdscr.addstr(25,30, oligos[0][0] + '\t' + oligos[0][1])
+
+        # Refresh the screen
+        stdscr.refresh()
+
+        # Wait for next input
+        k = stdscr.getch()
 
 def main():
-    t = Tk()
-    frame = Options(t)
-    frame.pack()
-    t.title("Go Go CRISPR")
-    t.minsize(width=600, height=100)
+    curses.wrapper(draw_menu)
 
-    titles = ["Initials", "Next Oligo", "Genome Locus", "Protospacer Sequence", "Genomic Sequence (+/- 1 kb)"]
-    title_coordinates = [[0, 1, 0], [2, 1, 3], [0, 2, 0], [0, 3, 0], [0, 4, 0]]
-
-    for i in range(len(titles)):
-        Label(frame, text=titles[i]).grid(row=title_coordinates[i][0], column=title_coordinates[i][1],
-                                          pady=title_coordinates[i][2])
-
-    buttons = ["Quit", "+", "GO GO CRISPR!"]
-    button_commands = [frame.quit, frame.add, frame.output]
-    button_coordinates = [[0, 0], [0, 5], [0, 6]]
-
-    for j in range(len(buttons)):
-        Button(frame, text=buttons[j], command=button_commands[j]).grid(row=button_coordinates[j][0],
-                                                                        column=button_coordinates[j][1])
-
-    mainloop()
-
-main()
+if __name__ == "__main__":
+    main()
